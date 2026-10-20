@@ -13,6 +13,8 @@ Here is the step-by-step process to launch a new app (using `monthlybudget` as a
 3. Name your new repository (e.g., `monthlybudget`). 
 4. **Crucial:** Ensure the new repository is set to **Private** so GitHub Actions can securely build and push the image to your private GHCR (GitHub Container Registry).
 
+1.Open the Starter Repository Settings:Under your user account.Navigate to your server-app-starter repository on GitHub and click the Settings tab (the gear icon on the top right of the repository menu).2.Enable Template Mode:Checkbox.In the General settings, look under the repository name section. Check the box that says Template repository.Verification: A small "Public template" or "Private template" badge will appear next to your repository name at the top of the page.3.Use the Template:Generate the new app.Go back to the main code page (<> Code tab) of your server-app-starter. You will now see a green Use this template button above the file list. Click it, then select Create a new repository.Verification: GitHub opens a creation page where you can name the new repository (e.g., monthlybudget), set it to Private, and generate a brand new, disconnected copy without carrying over the old commit history.
+
 ## Step 2: Clone the Repository to Your Server
 Your Homeserver Deployment Manager constantly watches the `/server/apps` directory. You need to pull your new repository into this folder.
 
