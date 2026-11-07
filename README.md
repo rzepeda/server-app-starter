@@ -209,3 +209,25 @@ SSH into your server and run:
 mkdir -p /server/apps/monthlybudget
 cd /server/apps/monthlybudget
 nano deploy.yml
+
+## Automatic Android APK delivery (included in this template)
+
+The same push to `main` that publishes the Flutter Web + FastAPI Docker image now also compiles a Flutter Android release APK and packages it into that image.
+
+1. **Before your first deployment**, edit `deploy.yml` for your new application: `name`, GHCR `image`, `container_name`, and `public.subdomain`. Keep `apk.enabled: true` and `apk.container_path: /app/app-release.apk`.
+2. The workflow `.github/workflows/publish-image.yml` uses Flutter 3.19.0 and JDK 17 to build `app/frontend/app-release.apk` for each push to `main`. Android receives `API_BASE_URL=https://<public.subdomain>.agentictools.uk` via `--dart-define`, based on the app's own `deploy.yml`. The Flutter application must explicitly read that variable (for example, with `const String.fromEnvironment('API_BASE_URL')`) before using it for network requests.
+3. GitHub Actions uploads a downloadable artifact named `<repository-name>-release-apk` (retained for 14 days) and includes the APK in the Docker image at `/app/app-release.apk`.
+4. After GHCR publishes the image, the homeserver `server-manager` can extract the APK and publish it on `https://apks.agentictools.uk/<deploy.name>.apk`, provided APK Hub extraction and Caddy static hosting are already configured.
+
+The original Flutter Web deployment and `/health` endpoint are unchanged. Pull requests also run Flutter analysis, tests, Web compilation, and Android APK compilation via `validate-flutter.yml` before merge.
+
+### Important setup for each new Android application
+
+- Change `applicationId` and `namespace` in `app/frontend/android/app/build.gradle` to unique values; adapt the Kotlin `MainActivity` package/path, Android app label, and launcher resources as needed. A new repository name alone does **not** change an Android package ID.
+- The starter currently signs `release` APKs with the Android **debug signing key**, suitable for initial testing only. Configure a persistent, securely stored release keystore for reliable over-the-air manual updates and production distribution. Without a stable key, consecutive CI builds may not install over one another.
+- The standard APK file path is independent of the app name. The APK Hub filename is determined by `deploy.yml` `name`, not the Flutter package name.
+- The build runs automatically on `main`; the README's optional `dev` branch process requires separate workflow changes if you choose to enable it. No placeholder/mock APK is used in the default production flow.
+
+### Verifying APK publication
+
+Go to **GitHub Actions → Build and Publish to GHCR** and confirm that **Build Android release APK**, **Upload APK as a workflow artifact**, and **Build and push Docker image** succeeded. Then inspect `docker logs --tail 100 homeserver-deployment-manager` for the extraction status and test the APK Hub URL.

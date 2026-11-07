@@ -1,0 +1,8 @@
+# Keep Flutter build outputs out of the Docker context, except the APK.
+app/frontend/build/
+app/frontend/.dart_tool/
+app/frontend/.gradle/
+app/frontend/android/.gradle/
+app/frontend/.flutter-plugins
+app/frontend/.flutter-plugins-dependencies
+.git/
