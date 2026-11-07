@@ -18,3 +18,8 @@ database:
 secrets:
   required:
     - OPENAI_API_KEY
+
+# server-manager extracts the APK from the published Docker image.
+apk:
+  enabled: true
+  container_path: /app/app-release.apk

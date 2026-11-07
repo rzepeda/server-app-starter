@@ -1,0 +1,63 @@
+name: Validate Flutter Web and Android
+
+on:
+  pull_request:
+    paths:
+      - 'app/frontend/**'
+      - 'Dockerfile'
+      - 'deploy.yml'
+      - '.github/workflows/publish-image.yml'
+      - '.github/workflows/validate-flutter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-validation:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: app/frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install Flutter (same version as Docker build)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: stable
+          cache: true
+
+      - name: Restore missing Android Gradle wrapper
+        run: |
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            flutter create --platforms=android --no-overwrite .
+          fi
+          test -f android/gradlew
+          test -f android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Compile Flutter Web
+        run: flutter build web --release
+
+      - name: Compile Android APK
+        run: |
+          flutter build apk --release
+          test -s build/app/outputs/flutter-apk/app-release.apk

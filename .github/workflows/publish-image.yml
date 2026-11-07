@@ -12,6 +12,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  APP_DOMAIN: agentictools.uk
 
 jobs:
   build-and-push:
@@ -19,6 +20,60 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install Flutter (same version as Docker build)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: stable
+          cache: true
+
+      - name: Restore missing Android Gradle wrapper
+        working-directory: app/frontend
+        run: |
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            flutter create --platforms=android --no-overwrite .
+          fi
+          test -f android/gradlew
+          test -f android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Resolve Flutter dependencies
+        working-directory: app/frontend
+        run: flutter pub get
+
+      - name: Determine app backend URL from deploy.yml
+        id: app-config
+        run: |
+          SUBDOMAIN="$(awk '/^public:/{in_public=1; next} in_public && /^[^[:space:]#]/{in_public=0} in_public && /^[[:space:]]+subdomain:[[:space:]]*/{print $2; exit}' deploy.yml)"
+          if [ -z "$SUBDOMAIN" ]; then
+            echo "Missing public.subdomain in deploy.yml" >&2
+            exit 1
+          fi
+          echo "api_base_url=https://${SUBDOMAIN}.${APP_DOMAIN}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android release APK
+        working-directory: app/frontend
+        run: |
+          flutter build apk --release \
+            --build-number="$GITHUB_RUN_NUMBER" \
+            --dart-define=API_BASE_URL=${{ steps.app-config.outputs.api_base_url }}
+          cp build/app/outputs/flutter-apk/app-release.apk app-release.apk
+          test -s app-release.apk
+
+      - name: Upload APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-release-apk
+          path: app/frontend/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,7 +94,7 @@ jobs:
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (web + APK)
         uses: docker/build-push-action@v6
         with:
           context: .
