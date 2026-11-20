@@ -80,9 +80,10 @@ jobs:
     defaults:
       run:
         working-directory: app/frontend
-    env:
-      PUB_CACHE: ${{ runner.temp }}/pub-cache
     steps:
+      - name: Configure job-local Pub cache
+        shell: bash
+        run: echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
       - name: Checkout without persistent credentials
         uses: actions/checkout@v4
         with:
