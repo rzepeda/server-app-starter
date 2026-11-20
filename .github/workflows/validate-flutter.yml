@@ -9,12 +9,21 @@ on:
       - '.github/workflows/publish-image.yml'
       - '.github/workflows/validate-flutter.yml'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/frontend/**'
+      - 'Dockerfile'
+      - 'deploy.yml'
+      - '.github/workflows/publish-image.yml'
+      - '.github/workflows/validate-flutter.yml'
 
 permissions:
   contents: read
 
 jobs:
   flutter-validation:
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -61,3 +70,33 @@ jobs:
         run: |
           flutter build apk --release
           test -s build/app/outputs/flutter-apk/app-release.apk
+
+  flutter-homeserver-smoke:
+    name: Flutter unit tests and static analysis (homeserver)
+    # Run only after trusted code reaches main. PRs and Android builds stay hosted.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, homeserver-ci-safe]
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: app/frontend
+    steps:
+      - name: Configure job-local Pub cache
+        shell: bash
+        run: echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
+      - name: Checkout without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Flutter SDK for Linux testing
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: stable
+          cache: false
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+      - name: Analyze Dart sources
+        run: flutter analyze
+      - name: Run Flutter unit tests
+        run: flutter test
